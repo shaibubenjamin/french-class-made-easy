@@ -50,7 +50,10 @@ function ServerUnavailable({ message }: { message: string }) {
         {missing.length > 0 ? (
           <p>The server is missing these settings: <code>{missing.join(", ")}</code>.</p>
         ) : (
-          <p className="muted">If you're running locally, start the full app with <code>npx netlify-cli dev</code> (port 8888).</p>
+          <p className="muted">
+            Use the live site at <a href="https://french-class-made-easy.netlify.app">french-class-made-easy.netlify.app</a>,
+            or run the full app locally with <code>npx netlify-cli dev</code> (port 8888).
+          </p>
         )}
         <div className="row">
           <button className="btn" onClick={() => refresh()}>Try again</button>

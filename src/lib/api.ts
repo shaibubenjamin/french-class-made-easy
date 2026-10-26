@@ -29,7 +29,8 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = { error: text };
+    // An HTML page here means /api isn't wired up (e.g. plain `vite` without Netlify Functions).
+    throw new ApiError(res.status, "The app's API isn't reachable from this address.", {});
   }
   if (!res.ok) {
     throw new ApiError(res.status, (data.error as string) || `Request failed (${res.status})`, data);
