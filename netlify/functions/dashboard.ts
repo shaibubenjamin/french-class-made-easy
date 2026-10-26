@@ -3,7 +3,10 @@ import { requireLevel, requireUser } from "../lib/auth.ts";
 import { db, must } from "../lib/db.ts";
 import { handle, json } from "../lib/http.ts";
 import { currentLesson } from "../lib/lessons.ts";
-import { displayStreak, type StreakState } from "../lib/streak.ts";
+import { getLevelStatus } from "../lib/level-status.ts";
+import { nextLevel } from "../../shared/progression.ts";
+import { streakStatus, MAX_MISSED_DAYS, type StreakState } from "../lib/streak.ts";
+import { addDays } from "../lib/time.ts";
 import { localParts } from "../lib/time.ts";
 import { SKILLS } from "../../shared/levels.ts";
 
@@ -13,7 +16,7 @@ export default handle(async (req) => {
   const level = requireLevel(user);
   const today = localParts(user.timezone).date;
 
-  const [found, streakRes, completedRes, attemptsRes] = await Promise.all([
+  const [found, streakRes, completedRes, attemptsRes, levelStatus, daysRes] = await Promise.all([
     currentLesson(user.id, level),
     db().from("streaks").select("*").eq("user_id", user.id).single(),
     db()
@@ -27,7 +30,17 @@ export default handle(async (req) => {
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(500),
+    getLevelStatus(user.id, level),
+    // Days with any practice, for the calendar (about six months back).
+    db()
+      .from("exercise_attempts")
+      .select("local_date")
+      .eq("user_id", user.id)
+      .gte("local_date", addDays(today, -190))
+      .order("local_date", { ascending: false })
+      .limit(5000),
   ]);
+  const practiceDays = [...new Set((must(daysRes) as { local_date: string }[]).map((d) => d.local_date))];
 
   let todayCard = null;
   if (found) {
@@ -62,16 +75,22 @@ export default handle(async (req) => {
   });
 
   const streak = must(streakRes) as StreakState;
+  const status = streakStatus(streak, today);
   return json({
     level,
     today: todayCard,
     streak: {
-      current: displayStreak(streak, today),
+      current: status.current,
       longest: streak.longest,
-      freezes_left: streak.freezes_left,
+      risk: status.risk,
+      missed_days: status.missed,
+      max_missed_days: MAX_MISSED_DAYS,
       practised_today: streak.last_active_date === today,
     },
+    today_date: today,
+    practice_days: practiceDays,
     lessons_completed: completedRes.count ?? 0,
+    level_status: { ...levelStatus, next_level: nextLevel(level) },
     skills,
   });
 });

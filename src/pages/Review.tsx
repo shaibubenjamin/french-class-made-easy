@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Spinner } from "../components/ui.tsx";
-import { api, errorMessage } from "../lib/api.ts";
+import { useApi } from "../lib/api.ts";
 
 interface ReviewItem {
   prompt: string;
@@ -11,13 +11,8 @@ interface ReviewItem {
 
 /** In-app evening review: today's mistakes, or vocabulary when there are none. */
 export default function Review() {
-  const [data, setData] = useState<{ items: ReviewItem[]; fromMistakes: boolean } | null>(null);
+  const { data, error } = useApi<{ items: ReviewItem[]; fromMistakes: boolean }>("/review");
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api<{ items: ReviewItem[]; fromMistakes: boolean }>("/review").then(setData).catch((e) => setError(errorMessage(e)));
-  }, []);
 
   if (error) return <div className="container"><Alert kind="error">{error}</Alert></div>;
   if (!data) return <Spinner />;

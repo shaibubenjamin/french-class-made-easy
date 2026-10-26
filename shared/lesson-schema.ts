@@ -51,6 +51,8 @@ export const LessonContentSchema = z.object({
   /** Shown after the learner submits, instead of AI feedback. */
   writing_model: z.string(),
   writing_checklist: z.array(z.string()),
+  /** Speaking task; keywords are target expressions ("a|b" = alternatives). */
+  speaking: z.object({ prompt: z.string(), en: z.string().optional(), keywords: z.array(z.string()) }),
   email_snippet: z.object({
     word_of_day: z.object({ fr: z.string(), en: z.string(), example: z.string() }),
     mini_question: z.object({
@@ -60,6 +62,9 @@ export const LessonContentSchema = z.object({
     }),
   }),
 });
+
+/** Dictation exercises replay these vocabulary example sentences (by index). */
+export const DICTATION_SOURCES: Record<string, number> = { dict1: 1, dict2: 5 };
 
 export type Exercise = z.infer<typeof ExerciseSchema>;
 export type ComprehensionQuestion = z.infer<typeof ComprehensionQuestionSchema>;
@@ -76,7 +81,9 @@ export function validateLessonShape(lesson: LessonContent): string[] {
   if (!lesson.writing_prompt.trim()) problems.push("writing_prompt is empty");
   if (!lesson.writing_model.trim()) problems.push("writing_model is empty");
   if (lesson.writing_checklist.length === 0) problems.push("writing_checklist is empty");
-  if (lesson.grammar.examples.length === 0) problems.push("grammar needs examples");
+  if (lesson.grammar.examples.length < 2) problems.push("grammar needs at least 2 examples (used for read-aloud)");
+  if (!lesson.speaking.prompt.trim() || lesson.speaking.keywords.length < 2) problems.push("speaking needs a prompt and at least 2 keywords");
+  if (lesson.vocabulary.length < 6) problems.push("vocabulary too short for dictation");
 
   const ids = new Set<string>();
   for (const ex of [...lesson.exercises, ...lesson.text.questions]) {

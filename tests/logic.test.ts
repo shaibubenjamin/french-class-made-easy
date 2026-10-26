@@ -1,9 +1,9 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { gradeByRules, normalize } from "../netlify/lib/grading.ts";
-import { applyActivity, displayStreak, type StreakState } from "../netlify/lib/streak.ts";
+import { applyActivity, displayStreak, streakStatus, type StreakState } from "../netlify/lib/streak.ts";
 import { dueEmails, type EmailPrefs } from "../netlify/lib/scheduler.ts";
-import { addDays, localParts, mondayOf } from "../netlify/lib/time.ts";
+import { addDays, localParts } from "../netlify/lib/time.ts";
 import { unsubscribeToken, verifySvixSignature, verifyUnsubscribeToken } from "../netlify/lib/tokens.ts";
 import { QUESTION_BANK } from "../data/question-bank.ts";
 import { LEVELS } from "../shared/levels.ts";
@@ -49,28 +49,30 @@ describe("streaks", () => {
     expect(s.longest).toBe(2);
   });
 
-  it("uses the weekly freeze for one missed day", () => {
-    let s = applyActivity(fresh, "2026-10-20"); // Tue
-    s = applyActivity(s, "2026-10-22"); // Thu, missed Wed
+  it("keeps the streak after 1 or 2 missed days", () => {
+    let s = applyActivity(fresh, "2026-10-20");
+    s = applyActivity(s, "2026-10-22"); // missed 1 day
     expect(s.current).toBe(2);
-    expect(s.freezes_left).toBe(0);
-    s = applyActivity(s, "2026-10-24"); // Sat, missed Fri, no freeze left
-    expect(s.current).toBe(1);
+    s = applyActivity(s, "2026-10-25"); // missed 2 days in a row
+    expect(s.current).toBe(3);
   });
 
-  it("refills the freeze each ISO week", () => {
-    expect(mondayOf("2026-10-25")).toBe("2026-10-19"); // Sunday → previous Monday
-    let s = applyActivity(fresh, "2026-10-22");
-    s = applyActivity(s, "2026-10-24"); // uses freeze
-    s = applyActivity(s, "2026-10-27"); // new week, but 3-day gap
+  it("resets after 3 missed days in a row", () => {
+    let s = applyActivity(fresh, "2026-10-20");
+    s = applyActivity(s, "2026-10-21");
+    s = applyActivity(s, "2026-10-25"); // missed 22, 23, 24
     expect(s.current).toBe(1);
-    expect(s.freezes_left).toBe(1);
+    expect(s.longest).toBe(2);
   });
 
-  it("displays 0 once lapsed", () => {
-    const s = { ...fresh, current: 5, last_active_date: "2026-10-20", freezes_left: 0 };
-    expect(displayStreak(s, "2026-10-21")).toBe(5);
-    expect(displayStreak(s, "2026-10-23")).toBe(0);
+  it("warns before the streak is lost", () => {
+    const s = { ...fresh, current: 10, longest: 10, last_active_date: "2026-10-20" };
+    expect(streakStatus(s, "2026-10-20")).toMatchObject({ current: 10, risk: "safe" });
+    expect(streakStatus(s, "2026-10-21")).toMatchObject({ current: 10, risk: "practise-today", missed: 0 });
+    expect(streakStatus(s, "2026-10-22")).toMatchObject({ current: 10, risk: "practise-today", missed: 1 });
+    expect(streakStatus(s, "2026-10-23")).toMatchObject({ current: 10, risk: "last-chance", missed: 2 });
+    expect(streakStatus(s, "2026-10-24")).toMatchObject({ current: 0, risk: "lost" });
+    expect(displayStreak(s, "2026-10-24")).toBe(0);
   });
 });
 
@@ -163,7 +165,7 @@ describe("lesson validation", () => {
     seq: 1,
     theme: "Au travail",
     vocabulary: Array.from({ length: 8 }, (_, i) => ({ fr: `mot${i}`, en: `word${i}`, example: "…" })),
-    grammar: { topic: "imparfait", explanation: "…", examples: ["…"] },
+    grammar: { topic: "imparfait", explanation: "…", examples: ["Il pleuvait.", "Je dormais."] },
     text: {
       title: "Titre",
       body: "Texte",
@@ -182,6 +184,7 @@ describe("lesson validation", () => {
     writing_prompt: "Décrivez…",
     writing_model: "Modèle.",
     writing_checklist: ["point 1"],
+    speaking: { prompt: "Parlez-nous de vous.", keywords: ["je suis", "j'habite"] },
     email_snippet: { word_of_day: { fr: "a", en: "b", example: "c" }, mini_question: { prompt: "?", options: ["a", "b"], answer: "a" } },
   };
 

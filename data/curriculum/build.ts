@@ -53,7 +53,8 @@ export interface LessonSpec {
   writing: { prompt: string; model: string; checklist: string[] };
 }
 
-export function course(level: Level, specs: LessonSpec[]): LessonContent[] {
+/** Lessons without the speaking task, which is merged in from speaking.ts (see index.ts). */
+export function course(level: Level, specs: LessonSpec[]): Omit<LessonContent, "speaking">[] {
   return specs.map((s, i) => {
     const exercises = s.exercises.map((e, n) => ({ ...e, id: `ex${n + 1}` }));
     const firstMcq = exercises.find((e) => e.type === "mcq") ?? exercises[0];

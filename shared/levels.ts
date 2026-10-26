@@ -65,7 +65,7 @@ export const LEVEL_INFO: Record<
   },
 };
 
-export const SKILLS = ["vocabulary", "grammar", "reading", "writing"] as const;
+export const SKILLS = ["vocabulary", "grammar", "reading", "listening", "speaking", "writing"] as const;
 export type Skill = (typeof SKILLS)[number];
 
 /** Explanations are given in French from C1 upwards (FR-25). */

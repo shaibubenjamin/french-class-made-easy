@@ -7,7 +7,7 @@ import { loadApprovedLesson, recordActivity } from "../lib/lessons.ts";
 import { localParts } from "../lib/time.ts";
 
 const Body = z.object({
-  step: z.enum(["vocabulary", "grammar", "text", "exercises", "writing", "done"]),
+  step: z.enum(["vocabulary", "grammar", "listen", "practice", "speak", "write", "done", "text", "exercises", "writing"]),
   complete: z.boolean().optional(),
 });
 

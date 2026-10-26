@@ -5,10 +5,26 @@ import { supabase, supabaseConfigured } from "../lib/supabase.ts";
 import { useSession } from "../lib/session.tsx";
 import { LEVELS, LEVEL_INFO } from "../../shared/levels.ts";
 
+const LESSON_PARTS = [
+  { icon: "📖", title: "Words", text: "8 new words with audio and example sentences." },
+  { icon: "🧩", title: "Grammar", text: "One clear rule at a time, with spoken examples." },
+  { icon: "🎧", title: "Listen", text: "Hear the text first, then dictation and videos." },
+  { icon: "✏️", title: "Practice", text: "Quick exercises with instant corrections." },
+  { icon: "🎙️", title: "Speak", text: "Record yourself and see what was understood." },
+  { icon: "📝", title: "Write", text: "Short writing tasks with a model answer." },
+];
+
+const STEPS = [
+  { n: 1, title: "Find your level", text: "A 15-question adaptive quiz — or choose from simple “I can…” descriptions." },
+  { n: 2, title: "Follow your course", text: "12 lessons per level. Each one takes 10–20 minutes, start to finish." },
+  { n: 3, title: "Build the habit", text: "Keep your 🔥 streak, track your days on the calendar, reach 80% to level up." },
+];
+
 export default function Landing() {
   const { session } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,88 +37,132 @@ export default function Landing() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
-      setError(/invalid/i.test(error.message) ? "That email and password don't match." : error.message);
+      setError(/invalid/i.test(error.message) ? "That email and password don't match. Please try again." : error.message);
       setBusy(false);
     }
     // On success the session listener redirects to the dashboard.
   }
 
   return (
-    <div className="container">
-      <section className="hero grid grid-2" style={{ alignItems: "center" }}>
-        <div>
-          <p className="eyebrow">French · A1 → C2</p>
-          <h1>Un peu de français, chaque jour.</h1>
-          <p className="lead">
-            Find your real level in under ten minutes, then work through a structured course for that level —
-            vocabulary, grammar, a short text, exercises and writing, one lesson at a time.
-          </p>
-        </div>
-        <div className="card">
-          <form onSubmit={submit}>
-            <h2>Sign in</h2>
-            <p className="muted small">This is a private class. Use the account you were given.</p>
-            {!supabaseConfigured && (
-              <Alert kind="warn">Supabase isn't configured. Copy .env.example to .env and fill it in.</Alert>
-            )}
-            <Alert kind="error">{error}</Alert>
-            <div className="field">
-              <label htmlFor="email">Email address</label>
-              <input
-                id="email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="vous@exemple.com"
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input
-                id="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <button className="btn btn-block" disabled={busy || !email || !password}>
-              {busy ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
+    <div className="landing">
+      <section className="landing-hero">
+        <div className="container hero-grid">
+          <div className="hero-copy">
+            <span className="pill">🇫🇷 Private French class · A1 → C2</span>
+            <h1 className="hero-title">
+              Parlez français,
+              <br />
+              <em>un jour à la fois.</em>
+            </h1>
+            <p className="hero-lead">
+              A calm, structured course that takes you from your first “bonjour” to fluent, nuanced French — reading,
+              listening, speaking and writing, a few minutes every day.
+            </p>
+            <ul className="skill-pills" aria-label="Skills you'll practise">
+              <li>📖 Read</li>
+              <li>🎧 Listen</li>
+              <li>🎙️ Speak</li>
+              <li>📝 Write</li>
+            </ul>
+            <dl className="trust">
+              <div><dt>72</dt><dd>lessons</dd></div>
+              <div><dt>6</dt><dd>levels</dd></div>
+              <div><dt>10′</dt><dd>a day</dd></div>
+            </dl>
+          </div>
+
+          <div className="signin-card">
+            <form onSubmit={submit}>
+              <p className="signin-hello">Bon retour 👋</p>
+              <h2 className="signin-title">Sign in to your class</h2>
+              {!supabaseConfigured && <Alert kind="warn">Supabase isn't configured. Copy .env.example to .env and fill it in.</Alert>}
+              <Alert kind="error">{error}</Alert>
+              <div className="field">
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="vous@exemple.com"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="password">Password</label>
+                <div className="password-field">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+              <button className="btn btn-block btn-big" disabled={busy || !email || !password}>
+                {busy ? "Signing in…" : "Sign in →"}
+              </button>
+              <p className="small muted signin-note">This is a private class. Accounts are created by your teacher.</p>
+            </form>
+          </div>
         </div>
       </section>
 
-      <section className="features grid grid-3" aria-label="How it works">
-        <div className="card feature">
-          <h3>1. Find your level</h3>
-          <p className="muted">An adaptive 15–20 question quiz, or pick from “I can…” descriptions.</p>
-        </div>
-        <div className="card feature">
-          <h3>2. A clear course</h3>
-          <p className="muted">72 lessons from A1 to C2, each with vocabulary, grammar, reading and writing.</p>
-        </div>
-        <div className="card feature">
-          <h3>3. Keep the habit</h3>
-          <p className="muted">Streaks, progress tracking, and reviews built from your mistakes.</p>
-        </div>
-      </section>
-
-      <section style={{ marginTop: 40 }}>
-        <h2>Every level, from Breakthrough to Mastery</h2>
-        <div className="grid grid-3">
-          {LEVELS.map((l) => (
-            <div className="card" key={l}>
-              <span className="level-tag">{l}</span> <strong>{LEVEL_INFO[l].name}</strong>
-              <p className="muted small" style={{ marginTop: 6, marginBottom: 0 }}>
-                {LEVEL_INFO[l].focus}
-              </p>
-            </div>
+      <section className="container landing-section" aria-labelledby="how-h">
+        <p className="section-eyebrow">How it works</p>
+        <h2 id="how-h" className="section-title">Three steps. No guesswork.</h2>
+        <ol className="steps-3">
+          {STEPS.map((s) => (
+            <li key={s.n}>
+              <span className="step-num">{s.n}</span>
+              <h3>{s.title}</h3>
+              <p className="muted">{s.text}</p>
+            </li>
           ))}
+        </ol>
+      </section>
+
+      <section className="landing-band">
+        <div className="container landing-section" aria-labelledby="lesson-h">
+          <p className="section-eyebrow">Inside every lesson</p>
+          <h2 id="lesson-h" className="section-title">All four skills, every single day.</h2>
+          <div className="lesson-tiles">
+            {LESSON_PARTS.map((p) => (
+              <div key={p.title} className="lesson-tile">
+                <span className="tile-icon" aria-hidden="true">{p.icon}</span>
+                <h3>{p.title}</h3>
+                <p className="muted small">{p.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
+      </section>
+
+      <section className="container landing-section" aria-labelledby="path-h">
+        <p className="section-eyebrow">Your path</p>
+        <h2 id="path-h" className="section-title">From Breakthrough to Mastery.</h2>
+        <ol className="level-path">
+          {LEVELS.map((l) => (
+            <li key={l}>
+              <span className="level-dot">{l}</span>
+              <strong>{LEVEL_INFO[l].name}</strong>
+              <span className="small muted">{LEVEL_INFO[l].focus}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="muted small path-note">Move up a level when you complete its 12 lessons with an average of 80% or more.</p>
       </section>
     </div>
   );

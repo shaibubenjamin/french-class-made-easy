@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase.ts";
-import { api, errorMessage } from "./api.ts";
+import { clearCache, errorMessage, fetchCached, peekCache } from "./api.ts";
 import { identify, resetAnalytics } from "./analytics.ts";
 import type { Me } from "./types.ts";
 
@@ -25,7 +25,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api<Me>("/me");
+      const data = await fetchCached<Me>("/me");
       setMe(data);
       setError(null);
       identify(data.profile.id, { level: data.profile.current_level });
@@ -42,6 +42,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!active) return;
       setSession(data.session);
+      const cached = data.session ? peekCache<Me>("/me") : undefined;
+      if (cached) {
+        // Show the app immediately with the last known profile, refresh quietly.
+        setMe(cached);
+        setLoading(false);
+        refresh();
+        return;
+      }
       if (data.session) await refresh();
       setLoading(false);
     });
@@ -62,6 +70,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     resetAnalytics();
+    clearCache();
     setMe(null);
   }, []);
 

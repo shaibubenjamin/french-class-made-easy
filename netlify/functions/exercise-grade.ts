@@ -2,7 +2,7 @@ import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { requireUser } from "../lib/auth.ts";
 import { db, must } from "../lib/db.ts";
-import { gradeByRules } from "../lib/grading.ts";
+import { dictationItem, gradeByRules } from "../lib/grading.ts";
 import { handle, HttpError, json, readBody } from "../lib/http.ts";
 import { loadApprovedLesson, recordActivity } from "../lib/lessons.ts";
 import { localParts } from "../lib/time.ts";
@@ -24,7 +24,8 @@ export default handle(async (req) => {
 
   const exercise = lesson.content.exercises.find((e) => e.id === body.exercise_ref);
   const question = lesson.content.text.questions.find((q) => q.id === body.exercise_ref);
-  const item = exercise ?? question;
+  const dictation = dictationItem(lesson.content, body.exercise_ref);
+  const item = exercise ?? question ?? dictation;
   if (!item) throw new HttpError(404, "Exercise not found");
 
   const rules = gradeByRules(item, body.answer);
@@ -49,7 +50,7 @@ export default handle(async (req) => {
       user_id: user.id,
       lesson_id: lesson.id,
       exercise_ref: body.exercise_ref,
-      skill: exercise?.skill ?? "reading",
+      skill: dictation ? "listening" : (exercise?.skill ?? "reading"),
       answer: body.answer,
       is_correct: isCorrect,
       ai_feedback: feedback,

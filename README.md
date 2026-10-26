@@ -29,6 +29,20 @@ tests/                   Vitest: logic, placement, and validation of every lesso
   - Writing shows a model text and a checklist.
 - **Streaks:** they count the days with practice, with one free missed day ("freeze") per week. Mistakes feed the **Review** page.
 
+### Listening & speaking (free, no AI)
+- **Listening:** every word, example and text can be played with the browser's built-in French voice (normal or slow). Each lesson also has two dictations and YouTube search links for its grammar point and theme.
+- **Speaking:**
+  - **Read aloud:** the browser's speech recognition transcribes what you say. Your score is the share of the sentence's words it recognised, with missed words highlighted.
+  - **"Parlez-nous de…":** an open question. The transcript is checked for the lesson's target expressions, and you listen back and self-check against a short checklist.
+  - Recordings stay on your device; only the transcript and score are saved.
+  - Automatic transcription works in Chrome, Edge and Android. Safari support varies; recording and self-check work everywhere.
+
+### Progress rules
+- **Lesson score:** the share of practice and reading questions answered correctly. You can redo a lesson to raise it.
+- **Moving up:** you can move up a level only after completing all 12 lessons with an **average of 80% or more**. You can't jump ahead to a higher level manually; the placement quiz can still place you higher.
+- **Streak:** practise daily. Missing 1–2 days in a row keeps the streak (with a warning to practise today). Missing 3 days in a row resets it to 0.
+- **Calendar:** the dashboard calendar marks every day you practised.
+
 ### Editing or adding lessons
 1. Edit `data/curriculum/<level>.ts`. Each lesson uses the `mcq`, `blank`, `reorder` and `translate` helpers.
 2. Run `npm test`. The tests check every lesson: counts, that each answer is one of its options, that each exercise accepts its own answer, and that word-order puzzles are actually shuffled.

@@ -1,4 +1,4 @@
-import type { Exercise, ComprehensionQuestion } from "../../shared/lesson-schema.ts";
+import { DICTATION_SOURCES, type ComprehensionQuestion, type Exercise, type LessonContent } from "../../shared/lesson-schema.ts";
 
 export function normalize(text: string): string {
   return text
@@ -38,7 +38,15 @@ export function gradeByRules(exercise: Gradable, answer: string): RuleResult {
   if (targets.some((t) => stripAccents(t) === stripAccents(given))) {
     return { correct: true, accentWarning: true };
   }
-  // Free-text translations can be right in many ways, so let the AI judge.
+  // Free-text translations can be right in many ways: the learner self-checks.
   if (type === "translation" && given.length > 0) return { correct: null };
   return { correct: false };
+}
+
+/** Dictation ("dict1", "dict2"): the learner hears a vocabulary example sentence and types it. */
+export function dictationItem(content: LessonContent, ref: string) {
+  const index = DICTATION_SOURCES[ref];
+  const sentence = index === undefined ? undefined : content.vocabulary[index]?.example;
+  if (!sentence) return undefined;
+  return { type: "fill_blank" as const, answer: sentence, accepted: [], explanation: "", tag: "dictation" };
 }

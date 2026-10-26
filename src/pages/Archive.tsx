@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, ProgressBar, Spinner } from "../components/ui.tsx";
-import { api, errorMessage } from "../lib/api.ts";
+import { useApi } from "../lib/api.ts";
+import { PASS_MARK } from "../../shared/progression.ts";
 import { useSession } from "../lib/session.tsx";
 
 interface Item {
@@ -18,12 +18,8 @@ interface Item {
 /** The whole course for the learner's level, in order (FR-16). */
 export default function Archive() {
   const { me } = useSession();
-  const [items, setItems] = useState<Item[] | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api<{ lessons: Item[] }>("/lessons").then((r) => setItems(r.lessons)).catch((e) => setError(errorMessage(e)));
-  }, []);
+  const { data, error } = useApi<{ lessons: Item[] }>("/lessons");
+  const items = data?.lessons;
 
   if (error) return <div className="container"><Alert kind="error">{error}</Alert></div>;
   if (!items) return <Spinner />;
@@ -32,7 +28,10 @@ export default function Archive() {
   return (
     <div className="container narrow">
       <h1>Your {me?.profile.current_level} course</h1>
-      <p className="muted">{done} of {items.length} lessons completed. You can open any lesson at any time.</p>
+      <p className="muted">
+        {done} of {items.length} lessons completed. Open any lesson at any time — lessons under {PASS_MARK}% can be redone to raise
+        your score.
+      </p>
       <div style={{ marginBottom: 16 }}>
         <ProgressBar value={done} max={Math.max(items.length, 1)} label="Course progress" />
       </div>
@@ -49,7 +48,11 @@ export default function Archive() {
                     <strong lang="fr">{l.theme}</strong>
                   </span>
                   {l.completed ? (
-                    <span className="badge badge-good">Done · {l.score ?? 0}%</span>
+                    (l.score ?? 0) >= PASS_MARK ? (
+                      <span className="badge badge-good">✓ {l.score ?? 0}%</span>
+                    ) : (
+                      <span className="badge badge-accent">{l.score ?? 0}% · redo to reach {PASS_MARK}%</span>
+                    )
                   ) : l.started ? (
                     <span className="badge badge-accent">In progress</span>
                   ) : (

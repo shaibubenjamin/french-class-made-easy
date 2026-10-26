@@ -17,13 +17,29 @@ export interface Profile {
   created_at: string;
 }
 
+// Verified token → user id, kept while the function instance is warm. A token
+// can't change owner, so this never goes stale; entries expire with the token.
+const verified = new Map<string, { userId: string; exp: number }>();
+
+async function userIdFromToken(token: string): Promise<string> {
+  const now = Date.now() / 1000;
+  const hit = verified.get(token);
+  if (hit && hit.exp > now) return hit.userId;
+  // getClaims verifies the JWT signature locally (cached JWKS) instead of a round trip to Auth.
+  const { data, error } = await db().auth.getClaims(token);
+  const sub = data?.claims?.sub;
+  if (error || !sub) throw new HttpError(401, "Your session has expired. Please sign in again.");
+  if (verified.size > 500) verified.clear();
+  verified.set(token, { userId: sub, exp: Math.min(Number(data.claims.exp) || now + 60, now + 600) });
+  return sub;
+}
+
 export async function requireUser(req: Request): Promise<Profile> {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) throw new HttpError(401, "Please sign in");
-  const { data, error } = await db().auth.getUser(token);
-  if (error || !data.user) throw new HttpError(401, "Your session has expired. Please sign in again.");
+  const userId = await userIdFromToken(token);
   const profile = must(
-    await db().from("profiles").select("*").eq("id", data.user.id).maybeSingle(),
+    await db().from("profiles").select("*").eq("id", userId).maybeSingle(),
   ) as Profile | null;
   if (!profile) throw new HttpError(401, "Profile not found");
   // Optional allowlist (comma-separated) for a private deployment.

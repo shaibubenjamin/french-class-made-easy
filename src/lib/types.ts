@@ -107,7 +107,25 @@ export interface Dashboard {
     score: number | null;
     step: string | null;
   } | null;
-  streak: { current: number; longest: number; freezes_left: number; practised_today: boolean };
+  streak: {
+    current: number;
+    longest: number;
+    risk: "safe" | "practise-today" | "last-chance" | "lost";
+    missed_days: number;
+    max_missed_days: number;
+    practised_today: boolean;
+  };
+  today_date: string;
+  practice_days: string[];
   lessons_completed: number;
+  level_status: {
+    total: number;
+    completed: number;
+    average: number | null;
+    allDone: boolean;
+    passed: boolean;
+    toImprove: { seq: number; theme: string; score: number }[];
+    next_level: Level | null;
+  };
   skills: { skill: string; attempts: number; accuracy: number | null }[];
 }
