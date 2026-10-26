@@ -160,7 +160,7 @@ describe("question bank", () => {
 describe("lesson validation", () => {
   const lesson: LessonContent = {
     level: "B1",
-    date: "2026-10-27",
+    seq: 1,
     theme: "Au travail",
     vocabulary: Array.from({ length: 8 }, (_, i) => ({ fr: `mot${i}`, en: `word${i}`, example: "…" })),
     grammar: { topic: "imparfait", explanation: "…", examples: ["…"] },
@@ -180,6 +180,8 @@ describe("lesson validation", () => {
       { id: "ex5", type: "mcq", skill: "vocabulary", prompt: "p", options: ["x", "y"], answer: "y", accepted: [], explanation: "", tag: "t" },
     ],
     writing_prompt: "Décrivez…",
+    writing_model: "Modèle.",
+    writing_checklist: ["point 1"],
     email_snippet: { word_of_day: { fr: "a", en: "b", example: "c" }, mini_question: { prompt: "?", options: ["a", "b"], answer: "a" } },
   };
 
@@ -198,5 +200,6 @@ describe("lesson validation", () => {
     const json = JSON.stringify(redactLesson(lesson));
     expect(json).not.toContain('"answer"');
     expect(json).not.toContain("email_snippet");
+    expect(json).not.toContain("writing_model");
   });
 });

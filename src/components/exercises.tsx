@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, errorMessage } from "../lib/api.ts";
 import { track } from "../lib/analytics.ts";
-import type { AttemptView, GradeFeedback, GradeResponse, WritingFeedback } from "../lib/types.ts";
+import type { AttemptView, GradeFeedback, GradeResponse, WritingResult } from "../lib/types.ts";
 import { Alert } from "./ui.tsx";
 
 interface Result {
@@ -20,13 +20,17 @@ function Feedback({ result }: { result: Result }) {
     <div className={`feedback ${ok ? "ok" : "no"}`} role="status" aria-live="polite">
       <p>
         <strong>{ok ? "Correct !" : "Not quite."}</strong>{" "}
-        {!ok && (
+        {(!ok || result.feedback.self_check) && (
           <>
-            Answer: <span lang="fr">{result.feedback.correct_answer}</span>
+            {result.feedback.self_check ? "Model answer" : "Answer"}: <span lang="fr">{result.feedback.correct_answer}</span>
           </>
         )}
       </p>
-      {result.feedback.accent_warning && <p>Watch your accents — compare with: <span lang="fr">{result.feedback.correct_answer}</span></p>}
+      {result.feedback.accent_warning && (
+        <p>
+          Watch your accents — compare with: <span lang="fr">{result.feedback.correct_answer}</span>
+        </p>
+      )}
       {result.feedback.explanation && <p>{result.feedback.explanation}</p>}
     </div>
   );
@@ -34,25 +38,31 @@ function Feedback({ result }: { result: Result }) {
 
 function useGrade(lessonId: string, refId: string, type: string, initial?: AttemptView) {
   const [result, setResult] = useState<Result | null>(fromAttempt(initial));
+  const [pending, setPending] = useState<GradeFeedback | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function grade(answer: string) {
+  async function grade(answer: string, selfAssessed?: boolean) {
     setBusy(true);
     setError("");
     try {
       const r = await api<GradeResponse>("/exercise/grade", {
-        body: { lesson_id: lessonId, exercise_ref: refId, answer },
+        body: { lesson_id: lessonId, exercise_ref: refId, answer, self_assessed: selfAssessed },
       });
-      setResult({ is_correct: r.is_correct, feedback: r });
-      track("exercise_answered", { type, correct: r.is_correct === true, ai: r.ai });
+      if (r.needs_self_check) {
+        setPending(r);
+      } else {
+        setPending(null);
+        setResult({ is_correct: r.is_correct, feedback: r });
+        track("exercise_answered", { type, correct: r.is_correct === true, self_check: r.self_check });
+      }
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
   }
-  return { result, setResult, busy, error, grade };
+  return { result, setResult, pending, setPending, busy, error, grade };
 }
 
 export interface ExerciseProps {
@@ -65,14 +75,21 @@ export interface ExerciseProps {
 }
 
 export function Exercise(props: ExerciseProps) {
-  const { result, setResult, busy, error, grade } = useGrade(props.lessonId, props.refId, props.type, props.initial);
+  const { result, setResult, pending, setPending, busy, error, grade } = useGrade(
+    props.lessonId,
+    props.refId,
+    props.type,
+    props.initial,
+  );
   const [value, setValue] = useState(props.initial?.answer ?? "");
   const [picked, setPicked] = useState<number[]>([]);
   const answered = result !== null;
+  const locked = answered || pending !== null;
   const inputId = `ex-${props.refId}`;
 
   const retry = () => {
     setResult(null);
+    setPending(null);
     setValue("");
     setPicked([]);
   };
@@ -121,7 +138,7 @@ export function Exercise(props: ExerciseProps) {
               type="button"
               className="token"
               key={`p${i}`}
-              disabled={answered}
+              disabled={locked}
               onClick={() => setPicked(picked.filter((_, p) => p !== pos))}
               aria-label={`Remove ${props.options[i]}`}
             >
@@ -131,7 +148,7 @@ export function Exercise(props: ExerciseProps) {
         </div>
         <div className="row" lang="fr" aria-label="Words to use">
           {remaining.map(({ w, i }) => (
-            <button type="button" className="token" key={`r${i}`} disabled={answered} onClick={() => setPicked([...picked, i])}>
+            <button type="button" className="token" key={`r${i}`} disabled={locked} onClick={() => setPicked([...picked, i])}>
               {w}
             </button>
           ))}
@@ -149,7 +166,7 @@ export function Exercise(props: ExerciseProps) {
             lang="fr"
             style={{ minHeight: 80 }}
             value={value}
-            disabled={answered}
+            disabled={locked}
             onChange={(e) => setValue(e.target.value)}
             placeholder="Écrivez en français…"
           />
@@ -162,7 +179,7 @@ export function Exercise(props: ExerciseProps) {
             autoCapitalize="off"
             spellCheck={false}
             value={value}
-            disabled={answered}
+            disabled={locked}
             onChange={(e) => setValue(e.target.value)}
             placeholder="Your answer"
           />
@@ -177,15 +194,31 @@ export function Exercise(props: ExerciseProps) {
         {props.prompt}
       </p>
       {body}
-      {!answered && props.type !== "mcq" && (
+      {!locked && props.type !== "mcq" && (
         <div className="row" style={{ marginTop: 10 }}>
           <button className="btn btn-secondary" disabled={busy || (props.type === "reorder" ? picked.length === 0 : !value.trim())}>
             {busy ? "Checking…" : "Check"}
           </button>
-          {props.type === "translation" && <span className="small muted">Any correct translation is accepted.</span>}
         </div>
       )}
       <Alert kind="error">{error}</Alert>
+      {pending && (
+        <div className="feedback" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }} role="status" aria-live="polite">
+          <p>
+            Compare with the model answer: <strong lang="fr">{pending.correct_answer}</strong>
+          </p>
+          {pending.explanation && <p className="muted">{pending.explanation}</p>}
+          <p style={{ marginBottom: 8 }}>Other wordings can be correct too. Does yours mean the same thing, with no grammar mistakes?</p>
+          <div className="row">
+            <button type="button" className="btn" disabled={busy} onClick={() => grade(value.trim(), true)}>
+              Yes, mine is right
+            </button>
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => grade(value.trim(), false)}>
+              No, I made a mistake
+            </button>
+          </div>
+        </div>
+      )}
       {result && <Feedback result={result} />}
       {result && result.is_correct !== true && (
         <button type="button" className="btn btn-ghost small" onClick={retry}>Try again</button>
@@ -194,38 +227,11 @@ export function Exercise(props: ExerciseProps) {
   );
 }
 
-/** Wraps each correction's excerpt in a <mark> so errors are highlighted in place. */
-function Highlighted({ text, corrections }: { text: string; corrections: WritingFeedback["corrections"] }) {
-  const parts: (string | { err: string; fix: string })[] = [];
-  let rest = text;
-  for (const c of corrections) {
-    const at = c.original ? rest.indexOf(c.original) : -1;
-    if (at < 0) continue;
-    parts.push(rest.slice(0, at), { err: c.original, fix: c.corrected });
-    rest = rest.slice(at + c.original.length);
-  }
-  parts.push(rest);
-  return (
-    <p className="prewrap" lang="fr">
-      {parts.map((p, i) =>
-        typeof p === "string" ? (
-          p
-        ) : (
-          <span key={i}>
-            <mark className="err" title={`Correction: ${p.fix}`}>{p.err}</mark>{" "}
-            <strong style={{ color: "var(--good)" }}>{p.fix}</strong>
-          </span>
-        ),
-      )}
-    </p>
-  );
-}
-
 export function WritingTask({ lessonId, prompt, initial }: { lessonId: string; prompt: string; initial?: AttemptView }) {
-  const initialFeedback = initial?.feedback && "corrections" in initial.feedback ? initial.feedback : null;
+  const initialResult = initial?.feedback && "model" in initial.feedback ? initial.feedback : null;
   const [text, setText] = useState(initial?.answer ?? "");
-  const [submitted, setSubmitted] = useState(initial?.answer ?? "");
-  const [feedback, setFeedback] = useState<WritingFeedback | null>(initialFeedback);
+  const [result, setResult] = useState<WritingResult | null>(initialResult);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -234,10 +240,8 @@ export function WritingTask({ lessonId, prompt, initial }: { lessonId: string; p
     setBusy(true);
     setError("");
     try {
-      const fb = await api<WritingFeedback>("/writing/feedback", { body: { lesson_id: lessonId, text } });
-      setFeedback(fb);
-      setSubmitted(text);
-      track("exercise_answered", { type: "writing", corrections: fb.corrections.length });
+      setResult(await api<WritingResult>("/writing/submit", { body: { lesson_id: lessonId, text } }));
+      track("exercise_answered", { type: "writing" });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -254,36 +258,33 @@ export function WritingTask({ lessonId, prompt, initial }: { lessonId: string; p
         <div className="row spread" style={{ marginTop: 10 }}>
           <span className="small muted">{text.trim().split(/\s+/).filter(Boolean).length} words</span>
           <button className="btn" disabled={busy || text.trim().length < 3}>
-            {busy ? "Reading your text…" : feedback ? "Get new feedback" : "Get feedback"}
+            {busy ? "Saving…" : result ? "Save new version" : "Compare with a model answer"}
           </button>
         </div>
       </form>
       <Alert kind="error">{error}</Alert>
-      {feedback && (
+      {result && (
         <div className="card" aria-live="polite">
-          <div className="row spread">
-            <h3 style={{ margin: 0 }}>Feedback</h3>
-            <span className="badge badge-accent">{feedback.score}/10</span>
-          </div>
-          <p style={{ marginTop: 12 }}>{feedback.overall_comment}</p>
-          {feedback.corrections.length > 0 ? (
-            <>
-              <Highlighted text={submitted} corrections={feedback.corrections} />
-              <h4>Corrections</h4>
-              {feedback.corrections.map((c, i) => (
-                <div className="correction" key={i}>
-                  <p style={{ margin: 0 }} lang="fr">
-                    <s>{c.original}</s> → <strong>{c.corrected}</strong> <span className="badge">{c.tag}</span>
-                  </p>
-                  <p className="small muted" style={{ margin: "4px 0 0" }}>{c.explanation}</p>
-                </div>
-              ))}
-            </>
-          ) : (
-            <Alert kind="success">No errors found — excellent work !</Alert>
-          )}
-          <h4>Improved version</h4>
-          <p className="prewrap passage" lang="fr">{feedback.rewritten}</p>
+          <h3>Model answer</h3>
+          <p className="prewrap passage" lang="fr">{result.model}</p>
+          <h4>Check your text</h4>
+          <p className="small muted">Tick each point your text gets right. Fix anything missing, then save a new version.</p>
+          {result.checklist.map((item, i) => (
+            <label className="checkbox" key={item} style={{ marginBottom: 8 }}>
+              <input
+                type="checkbox"
+                checked={checked.has(i)}
+                onChange={() => {
+                  const next = new Set(checked);
+                  if (next.has(i)) next.delete(i);
+                  else next.add(i);
+                  setChecked(next);
+                }}
+              />
+              <span lang="fr">{item}</span>
+            </label>
+          ))}
+          {checked.size === result.checklist.length && <Alert kind="success">Excellent — every point covered !</Alert>}
         </div>
       )}
     </div>

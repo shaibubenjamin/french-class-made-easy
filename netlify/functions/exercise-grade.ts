@@ -1,7 +1,6 @@
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
-import { requireLevel, requireUser } from "../lib/auth.ts";
-import { enforceDailyLimit, gradeFreeText } from "../lib/claude.ts";
+import { requireUser } from "../lib/auth.ts";
 import { db, must } from "../lib/db.ts";
 import { gradeByRules } from "../lib/grading.ts";
 import { handle, HttpError, json, readBody } from "../lib/http.ts";
@@ -12,12 +11,14 @@ const Body = z.object({
   lesson_id: z.string().uuid(),
   exercise_ref: z.string().min(1).max(20),
   answer: z.string().trim().min(1).max(500),
+  /** For translations the rules can't settle: the learner's own verdict after comparing. */
+  self_assessed: z.boolean().optional(),
 });
 
-// POST /api/exercise/grade — rules first, AI for free-text translations (US-3.5).
+// POST /api/exercise/grade — rule-based grading (US-3.5). Free translations
+// that don't match a model answer are self-checked by the learner.
 export default handle(async (req) => {
   const user = await requireUser(req);
-  const level = requireLevel(user);
   const body = await readBody(req, Body);
   const lesson = await loadApprovedLesson(body.lesson_id);
 
@@ -27,36 +28,20 @@ export default handle(async (req) => {
   if (!item) throw new HttpError(404, "Exercise not found");
 
   const rules = gradeByRules(item, body.answer);
-  let isCorrect = rules.correct;
-  let explanation = item.explanation;
-  let corrected = item.answer;
-  let errorTags: string[] = [];
-  let usedAi = false;
-
-  if (isCorrect === null && exercise) {
-    await enforceDailyLimit(user.id, "grade-answer");
-    const ai = await gradeFreeText({
-      userId: user.id,
-      level,
-      prompt: exercise.prompt,
-      reference: exercise.answer,
-      accepted: exercise.accepted,
-      answer: body.answer,
-    });
-    isCorrect = ai.is_correct;
-    explanation = ai.explanation;
-    corrected = ai.corrected;
-    errorTags = ai.error_tags;
-    usedAi = true;
-  }
-  if (isCorrect === false && exercise && errorTags.length === 0) errorTags = [exercise.tag];
-
   const feedback = {
-    explanation,
-    correct_answer: corrected,
+    explanation: item.explanation,
+    correct_answer: item.answer,
     accent_warning: rules.accentWarning ?? false,
-    ai: usedAi,
+    self_check: rules.correct === null,
   };
+
+  // Show the model answer first; record once the learner has judged their own answer.
+  if (rules.correct === null && body.self_assessed === undefined) {
+    return json({ is_correct: null, needs_self_check: true, ...feedback, error_tags: [] });
+  }
+
+  const isCorrect = rules.correct ?? body.self_assessed ?? false;
+  const errorTags = !isCorrect && exercise ? [exercise.tag] : [];
   const today = localParts(user.timezone).date;
 
   must(
@@ -80,7 +65,7 @@ export default handle(async (req) => {
   );
   await recordActivity(user.id, today);
 
-  return json({ is_correct: isCorrect, ...feedback, error_tags: errorTags });
+  return json({ is_correct: isCorrect, needs_self_check: false, ...feedback, error_tags: errorTags });
 });
 
 export const config: Config = { path: "/api/exercise/grade", method: "POST" };

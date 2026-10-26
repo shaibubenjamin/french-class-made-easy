@@ -1,7 +1,6 @@
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
-import { requireLevel, requireUser } from "../lib/auth.ts";
-import { enforceDailyLimit, writingFeedback } from "../lib/claude.ts";
+import { requireUser } from "../lib/auth.ts";
 import { db, must } from "../lib/db.ts";
 import { handle, json, readBody } from "../lib/http.ts";
 import { loadApprovedLesson, recordActivity } from "../lib/lessons.ts";
@@ -12,20 +11,13 @@ const Body = z.object({
   text: z.string().trim().min(3).max(3000),
 });
 
-// POST /api/writing/feedback — AI corrections on the lesson's writing task (FR-25, US-5.1).
+// POST /api/writing/submit — saves the learner's text and returns the model
+// answer and checklist so they can compare (no AI).
 export default handle(async (req) => {
   const user = await requireUser(req);
-  const level = requireLevel(user);
   const body = await readBody(req, Body);
   const lesson = await loadApprovedLesson(body.lesson_id);
-
-  await enforceDailyLimit(user.id, "writing-feedback");
-  const feedback = await writingFeedback({
-    userId: user.id,
-    level,
-    prompt: lesson.content.writing_prompt,
-    text: body.text,
-  });
+  const result = { model: lesson.content.writing_model, checklist: lesson.content.writing_checklist };
 
   const today = localParts(user.timezone).date;
   must(
@@ -35,15 +27,14 @@ export default handle(async (req) => {
       exercise_ref: "writing",
       skill: "writing",
       answer: body.text,
-      is_correct: feedback.corrections.length === 0,
-      ai_feedback: feedback,
-      error_tags: [...new Set(feedback.corrections.map((c) => c.tag))],
+      is_correct: null,
+      ai_feedback: result,
+      error_tags: [],
       local_date: today,
     }),
   );
   await recordActivity(user.id, today);
-
-  return json(feedback);
+  return json(result);
 });
 
-export const config: Config = { path: "/api/writing/feedback", method: "POST" };
+export const config: Config = { path: "/api/writing/submit", method: "POST" };

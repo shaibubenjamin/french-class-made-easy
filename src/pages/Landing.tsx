@@ -34,8 +34,8 @@ export default function Landing() {
           <p className="eyebrow">French · A1 → C2</p>
           <h1>Un peu de français, chaque jour.</h1>
           <p className="lead">
-            Find your real level in under ten minutes, then get a fresh lesson made for that level every
-            morning — vocabulary, grammar, a short text, exercises and writing with instant feedback.
+            Find your real level in under ten minutes, then work through a structured course for that level —
+            vocabulary, grammar, a short text, exercises and writing, one lesson at a time.
           </p>
         </div>
         <div className="card">
@@ -82,12 +82,12 @@ export default function Landing() {
           <p className="muted">An adaptive 15–20 question quiz, or pick from “I can…” descriptions.</p>
         </div>
         <div className="card feature">
-          <h3>2. A lesson a day</h3>
-          <p className="muted">Four strands every day: vocabulary, grammar, reading and writing.</p>
+          <h3>2. A clear course</h3>
+          <p className="muted">72 lessons from A1 to C2, each with vocabulary, grammar, reading and writing.</p>
         </div>
         <div className="card feature">
           <h3>3. Keep the habit</h3>
-          <p className="muted">A morning micro-lesson by email, streaks, and reviews built from your mistakes.</p>
+          <p className="muted">Streaks, progress tracking, and reviews built from your mistakes.</p>
         </div>
       </section>
 

@@ -20,8 +20,8 @@ export default function Layout({ children }: { children: ReactNode }) {
               {ready && (
                 <>
                   <NavLink to="/dashboard">Dashboard</NavLink>
-                  <NavLink to="/lesson/today">Today</NavLink>
-                  <NavLink to="/lessons">Past lessons</NavLink>
+                  <NavLink to="/lesson/today">Next lesson</NavLink>
+                  <NavLink to="/lessons">All lessons</NavLink>
                   <NavLink to="/review">Review</NavLink>
                 </>
               )}

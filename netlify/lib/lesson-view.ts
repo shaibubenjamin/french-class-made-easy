@@ -34,7 +34,7 @@ export async function lessonView(row: LessonRow, userId: string) {
   return {
     id: row.id,
     level: row.level,
-    date: row.date,
+    seq: row.seq,
     theme: row.theme,
     content: redactLesson(row.content),
     progress: must(progress),

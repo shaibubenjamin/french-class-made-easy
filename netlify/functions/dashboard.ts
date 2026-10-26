@@ -2,19 +2,19 @@ import type { Config } from "@netlify/functions";
 import { requireLevel, requireUser } from "../lib/auth.ts";
 import { db, must } from "../lib/db.ts";
 import { handle, json } from "../lib/http.ts";
-import { lessonForDay } from "../lib/lessons.ts";
+import { currentLesson } from "../lib/lessons.ts";
 import { displayStreak, type StreakState } from "../lib/streak.ts";
 import { localParts } from "../lib/time.ts";
 import { SKILLS } from "../../shared/levels.ts";
 
-// GET /api/dashboard — today's lesson card, streak, totals and skill chart (US-3.4).
+// GET /api/dashboard — current lesson, course progress, streak and skill chart (US-3.4).
 export default handle(async (req) => {
   const user = await requireUser(req);
   const level = requireLevel(user);
   const today = localParts(user.timezone).date;
 
   const [found, streakRes, completedRes, attemptsRes] = await Promise.all([
-    lessonForDay(level, today),
+    currentLesson(user.id, level),
     db().from("streaks").select("*").eq("user_id", user.id).single(),
     db()
       .from("lesson_progress")
@@ -42,8 +42,10 @@ export default handle(async (req) => {
     todayCard = {
       id: found.lesson.id,
       theme: found.lesson.theme,
-      date: found.lesson.date,
-      is_today: found.isToday,
+      position: found.position,
+      total: found.total,
+      completed_in_level: found.completedCount,
+      all_done: found.allDone,
       grammar_topic: found.lesson.content.grammar.topic,
       started: Boolean(progress),
       completed: Boolean(progress?.completed_at),

@@ -3,7 +3,6 @@ import { json } from "../lib/http.ts";
 
 const REQUIRED = {
   database: ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
-  ai: ["ANTHROPIC_API_KEY"],
   email: ["RESEND_API_KEY", "EMAIL_FROM", "UNSUBSCRIBE_SECRET"],
   jobs: ["INTERNAL_SECRET"],
 } as const;

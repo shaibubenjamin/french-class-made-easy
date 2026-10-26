@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Exercise, WritingTask } from "../components/exercises.tsx";
 import { Alert, Spinner } from "../components/ui.tsx";
 import { api, errorMessage } from "../lib/api.ts";
@@ -19,6 +19,9 @@ type StepId = (typeof STEPS)[number]["id"];
 
 export default function LessonPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  // Re-navigating to /lesson/today (after finishing) gets a new key and loads the next lesson.
+  const { key: navKey } = useLocation();
   const { refresh } = useSession();
   const [lesson, setLesson] = useState<LessonView | null>(null);
   const [step, setStep] = useState<StepId>("vocabulary");
@@ -37,10 +40,10 @@ export default function LessonPage() {
         const saved = l.progress?.state?.step as StepId | undefined;
         setStep(l.progress?.completed_at ? "done" : saved && STEPS.some((s) => s.id === saved) ? saved : "vocabulary");
         setScore(l.progress?.score ?? null);
-        if (!l.progress) track("lesson_started", { level: l.level, is_today: l.is_today ?? false });
+        if (!l.progress) track("lesson_started", { level: l.level, position: l.position ?? null });
       })
       .catch((e) => setError(errorMessage(e)));
-  }, [id]);
+  }, [id, navKey]);
 
   useEffect(() => {
     if (firstRender.current) {
@@ -100,7 +103,8 @@ export default function LessonPage() {
   return (
     <div className="container narrow">
       <p className="eyebrow">
-        {lesson.level} · {new Date(`${lesson.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+        {lesson.level}{lesson.position ? ` · Lesson ${lesson.position}${lesson.total ? ` of ${lesson.total}` : ""}` : ""}
+        {lesson.all_done && " · Review — you've completed this level!"}
       </p>
       <h1 lang="fr">{c.theme}</h1>
       <nav aria-label="Lesson steps">
@@ -206,7 +210,8 @@ export default function LessonPage() {
             <p className="stat">{score ?? 0}%</p>
             <p className="muted">of exercises and reading questions answered correctly.</p>
             <div className="row" style={{ justifyContent: "center" }}>
-              <Link className="btn" to="/dashboard">Back to dashboard</Link>
+              <button className="btn" onClick={() => navigate("/lesson/today")}>Next lesson →</button>
+              <Link className="btn btn-secondary" to="/dashboard">Dashboard</Link>
               <button className="btn btn-secondary" onClick={() => go("exercises")}>Review exercises</button>
             </div>
           </div>

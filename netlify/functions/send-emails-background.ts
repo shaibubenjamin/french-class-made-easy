@@ -11,7 +11,7 @@ import {
   type OutgoingEmail,
 } from "../lib/email.ts";
 import { handle, json, readBody } from "../lib/http.ts";
-import { lessonForDay } from "../lib/lessons.ts";
+import { currentLesson } from "../lib/lessons.ts";
 import { buildReview } from "../lib/review.ts";
 import { dueEmails, type EmailPrefs, type EmailType } from "../lib/scheduler.ts";
 import { displayStreak, type StreakState } from "../lib/streak.ts";
@@ -102,12 +102,8 @@ export default handle(async (req) => {
   }
 
   // 3. Build the content.
-  const lessonCache = new Map<string, LessonContent | null>();
-  const lessonFor = async (level: Level, date: string) => {
-    const key = `${level}|${date}`;
-    if (!lessonCache.has(key)) lessonCache.set(key, (await lessonForDay(level, date))?.lesson.content ?? null);
-    return lessonCache.get(key)!;
-  };
+  // Each learner's next lesson in their course.
+  const lessonFor = async (userId: string, level: Level) => (await currentLesson(userId, level))?.lesson.content ?? null;
 
   const outgoing: { userId: string; type: EmailType; localDate: string; email: OutgoingEmail }[] = [];
   for (const c of candidates) {
@@ -121,13 +117,13 @@ export default handle(async (req) => {
       const base = { userId: c.id, to: c.email, name: c.name };
       let email: OutgoingEmail | null = null;
       if (type === "morning") {
-        const lesson = await lessonFor(c.level, c.local.date);
+        const lesson = await lessonFor(c.id, c.level);
         if (lesson) email = morningEmail({ ...base, lesson });
       } else if (type === "afternoon") {
-        const lesson = await lessonFor(c.level, c.local.date);
+        const lesson = await lessonFor(c.id, c.level);
         email = afternoonEmail({ ...base, streak: displayStreak(c.streak, c.local.date), theme: lesson?.theme });
       } else if (type === "evening") {
-        const review = await buildReview(c.id, c.local.date, await lessonFor(c.level, c.local.date));
+        const review = await buildReview(c.id, c.local.date, await lessonFor(c.id, c.level));
         if (review.items.length) email = eveningEmail({ ...base, ...review });
       } else if (type === "weekly") {
         email = weeklyEmail({ ...base, streak: displayStreak(c.streak, c.local.date), ...(await weekStats(c.id, now)) });

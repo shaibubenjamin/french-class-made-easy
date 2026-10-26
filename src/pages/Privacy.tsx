@@ -12,7 +12,7 @@ export default function Privacy() {
         <h2>Why</h2>
         <p>
           To place you at the right level, generate feedback on your answers, keep your streak, and send the emails you
-          opted into. We send your exercise answers and writing to our AI provider (Anthropic) only to produce feedback.
+          opted into.
         </p>
         <h2>Analytics</h2>
         <p>
@@ -25,7 +25,7 @@ export default function Privacy() {
           purged within 30 days. Every email has a one-click unsubscribe link.
         </p>
         <h2>Processors</h2>
-        <p>Supabase (database and sign-in), Netlify (hosting), Anthropic (AI feedback), Resend (email), PostHog (analytics).</p>
+        <p>Supabase (database and sign-in), Netlify (hosting), Resend (email, if enabled), PostHog (analytics, if enabled).</p>
       </div>
     </div>
   );

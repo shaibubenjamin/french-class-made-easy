@@ -1,15 +1,13 @@
 import { db, must } from "./db.ts";
 import { HttpError } from "./http.ts";
-import { addDays } from "./time.ts";
 import { applyActivity, type StreakState } from "./streak.ts";
-import { generateLesson, MODELS } from "./claude.ts";
 import type { LessonContent } from "../../shared/lesson-schema.ts";
 import type { Level } from "../../shared/levels.ts";
 
 export interface LessonRow {
   id: string;
   level: Level;
-  date: string;
+  seq: number;
   theme: string;
   content: LessonContent;
   status: "draft" | "approved";
@@ -18,24 +16,52 @@ export interface LessonRow {
   updated_at: string;
 }
 
-/**
- * Today's approved lesson for a level. If it isn't approved yet (C1–C2 wait for
- * a human), falls back to the most recent approved lesson.
- */
-export async function lessonForDay(level: Level, localDate: string) {
-  const rows = must(
+/** The ordered course for a level (built-in curriculum, see data/curriculum). */
+export async function courseFor(level: Level): Promise<LessonRow[]> {
+  return must(
     await db()
       .from("lessons")
       .select("*")
       .eq("level", level)
       .eq("status", "approved")
-      .lte("date", localDate)
-      .gte("date", addDays(localDate, -30))
-      .order("date", { ascending: false })
-      .limit(1),
+      .not("seq", "is", null)
+      .order("seq"),
   ) as LessonRow[];
-  const lesson = rows[0];
-  return lesson ? { lesson, isToday: lesson.date === localDate } : null;
+}
+
+export async function completions(userId: string, lessonIds: string[]) {
+  if (!lessonIds.length) return new Map<string, { completed_at: string | null; score: number | null }>();
+  const rows = must(
+    await db()
+      .from("lesson_progress")
+      .select("lesson_id, completed_at, score")
+      .eq("user_id", userId)
+      .in("lesson_id", lessonIds),
+  ) as { lesson_id: string; completed_at: string | null; score: number | null }[];
+  return new Map(rows.map((r) => [r.lesson_id, r]));
+}
+
+/**
+ * The learner's current lesson: the first one not yet completed, in course
+ * order. Once the whole level is done, the least recently completed lesson
+ * comes round again for review.
+ */
+export async function currentLesson(userId: string, level: Level) {
+  const course = await courseFor(level);
+  if (!course.length) return null;
+  const done = await completions(userId, course.map((l) => l.id));
+  const completedCount = course.filter((l) => done.get(l.id)?.completed_at).length;
+
+  let index = course.findIndex((l) => !done.get(l.id)?.completed_at);
+  const allDone = index === -1;
+  if (allDone) {
+    index = course.reduce(
+      (oldest, l, i) =>
+        (done.get(l.id)?.completed_at ?? "") < (done.get(course[oldest].id)?.completed_at ?? "") ? i : oldest,
+      0,
+    );
+  }
+  return { lesson: course[index], position: index + 1, total: course.length, completedCount, allDone };
 }
 
 export async function loadApprovedLesson(id: string): Promise<LessonRow> {
@@ -61,48 +87,4 @@ export async function recordActivity(userId: string, localDate: string) {
   const next = applyActivity(base, localDate);
   must(await db().from("streaks").upsert({ user_id: userId, ...next }));
   return next;
-}
-
-/** Generates (or regenerates) the lesson for one level and date, with retries. */
-export async function generateAndStore(level: Level, date: string, opts: { force?: boolean; attempts?: number } = {}) {
-  const existing = must(
-    await db().from("lessons").select("id, status").eq("level", level).eq("date", date).maybeSingle(),
-  ) as { id: string; status: string } | null;
-  if (existing && !opts.force) return { skipped: true as const };
-
-  const recent = must(
-    await db()
-      .from("lessons")
-      .select("theme")
-      .eq("level", level)
-      .gte("date", addDays(date, -21))
-      .neq("date", date),
-  ) as { theme: string }[];
-
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= (opts.attempts ?? 3); attempt++) {
-    try {
-      const content = await generateLesson(level, date, recent.map((r) => r.theme));
-      must(
-        await db().from("lessons").upsert(
-          {
-            level,
-            date,
-            theme: content.theme,
-            content,
-            status: "draft",
-            model: MODELS.lesson,
-            reviewed_by: null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "level,date" },
-        ),
-      );
-      return { skipped: false as const, theme: content.theme };
-    } catch (err) {
-      lastError = err;
-      console.error(`Lesson ${level} ${date} attempt ${attempt} failed`, err);
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }

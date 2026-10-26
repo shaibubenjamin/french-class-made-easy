@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { LEVELS } from "./levels.ts";
 
-// Kept free of min/max constraints so it maps cleanly onto Claude structured
-// outputs; counts are checked separately in validateLessonShape().
+// The built-in curriculum (data/curriculum) uses this shape. Counts and
+// answer consistency are checked separately in validateLessonShape().
 
 export const ExerciseSchema = z.object({
   id: z.string().describe("Stable id such as ex1, ex2 …"),
@@ -32,7 +32,8 @@ export const ComprehensionQuestionSchema = z.object({
 
 export const LessonContentSchema = z.object({
   level: z.enum(LEVELS),
-  date: z.string().describe("YYYY-MM-DD"),
+  /** Position in the level's course, 1-based. */
+  seq: z.number().int(),
   theme: z.string(),
   vocabulary: z.array(z.object({ fr: z.string(), en: z.string(), example: z.string() })),
   grammar: z.object({
@@ -47,6 +48,9 @@ export const LessonContentSchema = z.object({
   }),
   exercises: z.array(ExerciseSchema),
   writing_prompt: z.string(),
+  /** Shown after the learner submits, instead of AI feedback. */
+  writing_model: z.string(),
+  writing_checklist: z.array(z.string()),
   email_snippet: z.object({
     word_of_day: z.object({ fr: z.string(), en: z.string(), example: z.string() }),
     mini_question: z.object({
@@ -70,6 +74,9 @@ export function validateLessonShape(lesson: LessonContent): string[] {
   if (e < 5 || e > 8) problems.push(`exercises must have 5–8 items (got ${e})`);
   if (lesson.text.questions.length < 2) problems.push("text needs at least 2 comprehension questions");
   if (!lesson.writing_prompt.trim()) problems.push("writing_prompt is empty");
+  if (!lesson.writing_model.trim()) problems.push("writing_model is empty");
+  if (lesson.writing_checklist.length === 0) problems.push("writing_checklist is empty");
+  if (lesson.grammar.examples.length === 0) problems.push("grammar needs examples");
 
   const ids = new Set<string>();
   for (const ex of [...lesson.exercises, ...lesson.text.questions]) {
@@ -83,9 +90,12 @@ export function validateLessonShape(lesson: LessonContent): string[] {
     if (ex.type === "fill_blank" && !ex.prompt.includes("___")) {
       problems.push(`${ex.id}: fill_blank prompt has no ___ gap`);
     }
-    if (ex.type === "reorder" && ex.options.length < 3) {
-      problems.push(`${ex.id}: reorder needs the shuffled words in options`);
+    if (ex.type === "reorder") {
+      if (ex.options.length < 3) problems.push(`${ex.id}: reorder needs the shuffled words in options`);
+      const words = (t: string) => t.replace(/[.!?]$/, "").split(/\s+/).sort().join(" ");
+      if (words(ex.options.join(" ")) !== words(ex.answer)) problems.push(`${ex.id}: reorder words don't match the answer`);
     }
+    if (!ex.answer.trim()) problems.push(`${ex.id}: empty answer`);
   }
   for (const q of lesson.text.questions) {
     if (!q.options.includes(q.answer)) problems.push(`${q.id}: answer is not one of the options`);
@@ -110,6 +120,8 @@ export function redactLesson(lesson: LessonContent) {
       prompt,
       options,
     })),
+    writing_model: undefined,
+    writing_checklist: undefined,
     email_snippet: undefined,
   };
 }

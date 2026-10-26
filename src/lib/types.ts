@@ -57,37 +57,39 @@ export type PlacementStep =
 export interface AttemptView {
   answer: string;
   is_correct: boolean | null;
-  feedback: GradeFeedback | WritingFeedback | null;
+  feedback: GradeFeedback | WritingResult | null;
 }
 
 export interface LessonView {
   id: string;
   level: Level;
-  date: string;
+  seq: number | null;
   theme: string;
   content: PublicLesson;
   progress: { completed_at: string | null; score: number | null; state: { step?: string } } | null;
   attempts: Record<string, AttemptView>;
-  is_today?: boolean;
+  position?: number | null;
+  total?: number;
+  all_done?: boolean;
 }
 
 export interface GradeFeedback {
   explanation: string;
   correct_answer: string;
   accent_warning: boolean;
-  ai: boolean;
+  /** Translation that the learner checks against the model answer. */
+  self_check: boolean;
 }
 
 export interface GradeResponse extends GradeFeedback {
   is_correct: boolean | null;
+  needs_self_check: boolean;
   error_tags: string[];
 }
 
-export interface WritingFeedback {
-  corrections: { original: string; corrected: string; explanation: string; tag: string }[];
-  rewritten: string;
-  overall_comment: string;
-  score: number;
+export interface WritingResult {
+  model: string;
+  checklist: string[];
 }
 
 export interface Dashboard {
@@ -95,8 +97,10 @@ export interface Dashboard {
   today: {
     id: string;
     theme: string;
-    date: string;
-    is_today: boolean;
+    position: number;
+    total: number;
+    completed_in_level: number;
+    all_done: boolean;
     grammar_topic: string;
     started: boolean;
     completed: boolean;

@@ -1,20 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Spinner } from "../components/ui.tsx";
+import { Alert, ProgressBar, Spinner } from "../components/ui.tsx";
 import { api, errorMessage } from "../lib/api.ts";
+import { useSession } from "../lib/session.tsx";
 
 interface Item {
   id: string;
-  date: string;
+  seq: number;
   theme: string;
   level: string;
+  grammar_topic: string;
   completed: boolean;
   started: boolean;
   score: number | null;
 }
 
-/** FR-16: lessons from the past 30 days at the learner's level. */
+/** The whole course for the learner's level, in order (FR-16). */
 export default function Archive() {
+  const { me } = useSession();
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState("");
 
@@ -25,22 +28,24 @@ export default function Archive() {
   if (error) return <div className="container"><Alert kind="error">{error}</Alert></div>;
   if (!items) return <Spinner />;
 
+  const done = items.filter((l) => l.completed).length;
   return (
     <div className="container narrow">
-      <h1>Past lessons</h1>
-      <p className="muted">The last 30 days at your level. Catch up on any you missed.</p>
+      <h1>Your {me?.profile.current_level} course</h1>
+      <p className="muted">{done} of {items.length} lessons completed. You can open any lesson at any time.</p>
+      <div style={{ marginBottom: 16 }}>
+        <ProgressBar value={done} max={Math.max(items.length, 1)} label="Course progress" />
+      </div>
       {items.length === 0 ? (
-        <Alert>No lessons yet — your first one arrives tomorrow morning.</Alert>
+        <Alert>No lessons are available for this level yet.</Alert>
       ) : (
         <div className="card" style={{ padding: 0 }}>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          <ol style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {items.map((l, i) => (
               <li key={l.id} style={{ borderTop: i ? "1px solid var(--line)" : 0 }}>
                 <Link to={`/lesson/${l.id}`} className="row spread" style={{ padding: "14px 20px", color: "inherit", textDecoration: "none" }}>
                   <span>
-                    <span className="small muted" style={{ display: "block" }}>
-                      {new Date(`${l.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}
-                    </span>
+                    <span className="small muted" style={{ display: "block" }}>Lesson {l.seq} · <span lang="fr">{l.grammar_topic}</span></span>
                     <strong lang="fr">{l.theme}</strong>
                   </span>
                   {l.completed ? (
@@ -53,7 +58,7 @@ export default function Archive() {
                 </Link>
               </li>
             ))}
-          </ul>
+          </ol>
         </div>
       )}
     </div>

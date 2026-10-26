@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Alert, BarChart, Spinner } from "../components/ui.tsx";
+import { Alert, BarChart, ProgressBar, Spinner } from "../components/ui.tsx";
 import { api, errorMessage } from "../lib/api.ts";
 import { useSession } from "../lib/session.tsx";
 import type { Dashboard as DashboardData } from "../lib/types.ts";
@@ -37,15 +37,18 @@ export default function Dashboard() {
       </div>
 
       <section className="card" aria-labelledby="today-h">
-        <p className="eyebrow">{t?.is_today === false ? "Latest lesson" : "Today's lesson"}</p>
+        <p className="eyebrow">{t ? `Lesson ${t.position} of ${t.total}${t.all_done ? " · review" : ""}` : "Your course"}</p>
         {t ? (
           <div className="row spread">
             <div>
               <h2 id="today-h" lang="fr" style={{ marginBottom: 4 }}>{t.theme}</h2>
               <p className="muted" style={{ margin: 0 }}>Grammar: <span lang="fr">{t.grammar_topic}</span></p>
-              {t.is_today === false && (
-                <p className="small muted" style={{ margin: "6px 0 0" }}>Today's lesson is still being reviewed — here's the most recent one.</p>
-              )}
+              <div style={{ marginTop: 10, maxWidth: 320 }}>
+                <ProgressBar value={t.completed_in_level} max={t.total} label={`${t.completed_in_level} of ${t.total} lessons completed in ${data.level}`} />
+                <p className="small muted" style={{ margin: "6px 0 0" }}>
+                  {t.all_done ? `You've completed all of ${data.level} — reviewing earlier lessons.` : `${t.completed_in_level} of ${t.total} lessons done in ${data.level}`}
+                </p>
+              </div>
             </div>
             {t.completed ? (
               <div className="row">
@@ -58,7 +61,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <p id="today-h" className="muted" style={{ margin: 0 }}>
-            Today's lesson for {data.level} isn't ready yet. New lessons arrive every morning — check back soon.
+            No lessons are available for {data.level} yet.
           </p>
         )}
       </section>

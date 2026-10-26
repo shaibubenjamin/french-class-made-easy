@@ -12,10 +12,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . && npm run typecheck",
     "test": "vitest run",
-    "seed:questions": "node scripts/build-question-seed.ts"
+    "seed:questions": "node scripts/build-question-seed.ts",
+    "seed:lessons": "node scripts/build-lesson-seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
     "@supabase/supabase-js": "^2.118.0",
     "posthog-js": "^1.438.23",
     "react": "^19.3.1",
