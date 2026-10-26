@@ -22,7 +22,11 @@ export default function Landing() {
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     if (error) {
-      setError(error.message);
+      setError(
+        /rate limit/i.test(error.message)
+          ? "We've sent too many sign-in emails in the last hour. Please check your inbox (and spam) for an earlier link, or try again in an hour."
+          : error.message,
+      );
       setStatus("idle");
     } else {
       setStatus("sent");
