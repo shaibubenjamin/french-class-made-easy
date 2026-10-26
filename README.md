@@ -27,7 +27,7 @@ tests/                   Vitest: logic, placement, and validation of every lesso
   - Multiple choice, fill-in-the-blank and word order are marked automatically. Accents and apostrophes are handled sensibly.
   - Translations that don't match the model answer exactly show it to the learner, who marks their own answer right or wrong.
   - Writing shows a model text and a checklist.
-- **Streaks:** they count the days with practice, with one free missed day ("freeze") per week. Mistakes feed the **Review** page.
+- **Review:** mistakes feed the **Review** page. Streak rules are under "Progress rules" below.
 
 ### Listening & speaking (free, no AI)
 - **Listening:** every word, example and text can be played with the browser's built-in French voice (normal or slow). Each lesson also has two dictations and YouTube search links for its grammar point and theme.
