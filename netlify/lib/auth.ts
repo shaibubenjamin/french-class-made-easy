@@ -26,6 +26,14 @@ export async function requireUser(req: Request): Promise<Profile> {
     await db().from("profiles").select("*").eq("id", data.user.id).maybeSingle(),
   ) as Profile | null;
   if (!profile) throw new HttpError(401, "Profile not found");
+  // Optional allowlist (comma-separated) for a private deployment.
+  const allowed = (process.env.ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length && !allowed.includes(profile.email.toLowerCase())) {
+    throw new HttpError(403, "This account doesn't have access to this class.");
+  }
   return profile;
 }
 

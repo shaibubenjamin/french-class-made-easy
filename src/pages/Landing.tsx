@@ -8,29 +8,23 @@ import { LEVELS, LEVEL_INFO } from "../../shared/levels.ts";
 export default function Landing() {
   const { session } = useSession();
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   if (session) return <Navigate to="/dashboard" replace />;
 
+  // Private app: accounts are created by the admin, so there is no sign-up here.
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    setStatus("sending");
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    });
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
-      setError(
-        /rate limit/i.test(error.message)
-          ? "We've sent too many sign-in emails in the last hour. Please check your inbox (and spam) for an earlier link, or try again in an hour."
-          : error.message,
-      );
-      setStatus("idle");
-    } else {
-      setStatus("sent");
+      setError(/invalid/i.test(error.message) ? "That email and password don't match." : error.message);
+      setBusy(false);
     }
+    // On success the session listener redirects to the dashboard.
   }
 
   return (
@@ -45,41 +39,40 @@ export default function Landing() {
           </p>
         </div>
         <div className="card">
-          {status === "sent" ? (
-            <div role="status">
-              <h2>Check your inbox</h2>
-              <p>
-                We sent a sign-in link to <strong>{email}</strong>. It arrives within a minute and works once.
-              </p>
-              <button className="btn btn-secondary" onClick={() => setStatus("idle")}>
-                Use a different email
-              </button>
+          <form onSubmit={submit}>
+            <h2>Sign in</h2>
+            <p className="muted small">This is a private class. Use the account you were given.</p>
+            {!supabaseConfigured && (
+              <Alert kind="warn">Supabase isn't configured. Copy .env.example to .env and fill it in.</Alert>
+            )}
+            <Alert kind="error">{error}</Alert>
+            <div className="field">
+              <label htmlFor="email">Email address</label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="vous@exemple.com"
+              />
             </div>
-          ) : (
-            <form onSubmit={submit} noValidate={false}>
-              <h2>Start learning — free</h2>
-              <p className="muted small">No password. We'll email you a magic link.</p>
-              {!supabaseConfigured && (
-                <Alert kind="warn">Supabase isn't configured. Copy .env.example to .env and fill it in.</Alert>
-              )}
-              <Alert kind="error">{error}</Alert>
-              <div className="field">
-                <label htmlFor="email">Email address</label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
-                />
-              </div>
-              <button className="btn btn-block" disabled={status === "sending" || !email}>
-                {status === "sending" ? "Sending…" : "Email me a sign-in link"}
-              </button>
-            </form>
-          )}
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <button className="btn btn-block" disabled={busy || !email || !password}>
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
       </section>
 
