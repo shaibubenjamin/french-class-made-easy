@@ -51,7 +51,7 @@ returns jsonb language sql stable security definer set search_path = public as $
     'ai_cost_by_day', coalesce((
       select jsonb_agg(jsonb_build_object('day', day, 'cost_usd', cost, 'calls', calls) order by day)
       from (
-        select date_trunc('day', created_at)::date day, sum(cost_usd) cost, count(*) calls
+        select date_trunc('day', created_at)::date as day, sum(cost_usd) as cost, count(*) as calls
         from ai_usage where created_at > now() - interval '14 days' group by 1
       ) t
     ), '[]'::jsonb),
