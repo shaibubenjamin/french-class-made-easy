@@ -6,7 +6,7 @@
   "description": "Parlons — AI French learning app (A1–C2) with placement, daily lessons and adaptive emails.",
   "scripts": {
     "dev": "netlify dev",
-    "dev:web": "vite",
+    "dev:web": "vite --port 5181 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",

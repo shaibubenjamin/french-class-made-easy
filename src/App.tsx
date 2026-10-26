@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import Layout from "./components/Layout.tsx";
 import { Spinner } from "./components/ui.tsx";
@@ -21,15 +21,44 @@ const Privacy = lazy(() => import("./pages/Privacy.tsx"));
 
 /** Signed-in routes. Sends users through onboarding and level choice first. */
 function Protected({ children, needsLevel = true, admin = false }: { children: ReactNode; needsLevel?: boolean; admin?: boolean }) {
-  const { session, me, loading } = useSession();
+  const { session, me, loading, error } = useSession();
   const location = useLocation();
   if (loading) return <Spinner />;
   if (!session) return <Navigate to="/" replace state={{ from: location.pathname }} />;
-  if (!me) return <Spinner />;
+  if (!me) return error ? <ServerUnavailable message={error} /> : <Spinner />;
   if (!me.profile.onboarded && location.pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
   if (needsLevel && !me.profile.current_level) return <Navigate to="/start" replace />;
   if (admin && !me.profile.is_admin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
+}
+
+/** Shown when signed in but the API can't load the profile, instead of spinning forever. */
+function ServerUnavailable({ message }: { message: string }) {
+  const { refresh, signOut } = useSession();
+  const [missing, setMissing] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h: { missing?: Record<string, string[]> } | null) => setMissing(Object.values(h?.missing ?? {}).flat()))
+      .catch(() => setMissing([]));
+  }, []);
+  return (
+    <div className="container narrow">
+      <div className="card stack">
+        <h1>You're signed in, but the app server isn't ready</h1>
+        <p className="muted">{message}</p>
+        {missing.length > 0 ? (
+          <p>The server is missing these settings: <code>{missing.join(", ")}</code>.</p>
+        ) : (
+          <p className="muted">If you're running locally, start the full app with <code>npx netlify-cli dev</code> (port 8888).</p>
+        )}
+        <div className="row">
+          <button className="btn" onClick={() => refresh()}>Try again</button>
+          <button className="btn btn-secondary" onClick={() => signOut()}>Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function EmailClickTracker() {
